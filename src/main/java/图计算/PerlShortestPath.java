@@ -7,12 +7,15 @@ import org.apache.flink.graph.Edge;
 import org.apache.flink.graph.Graph;
 import org.apache.flink.graph.GraphAlgorithm;
 import org.apache.flink.graph.Vertex;
+import org.apache.flink.graph.pregel.ComputeFunction;
+import org.apache.flink.graph.pregel.MessageCombiner;
+import org.apache.flink.graph.pregel.MessageIterator;
 
 import java.util.Arrays;
 import java.util.List;
 
 public class PerlShortestPath {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
 
         ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
 
@@ -81,3 +84,66 @@ class ShortestPath<K, VV> implements GraphAlgorithm<K, VV, Double, DataSet<Verte
     }
 }
 
+class ShortestPathComputeFunction<K> extends ComputeFunction<K, Double, Double, NewMinDistance> {
+
+    private final K sourceVertex;
+
+    public ShortestPathComputeFunction(K sourceVertex) {
+        this.sourceVertex = sourceVertex;
+    }
+
+    @Override
+    public void compute(Vertex<K, Double> vertex, MessageIterator<NewMinDistance> messageIterator) throws Exception {
+        // Send initial group of messages from the source vertex
+        if (vertex.getId().equals(sourceVertex) && getSuperstepNumber() == 1) {
+            sendNewDistanceToAll(0);
+        }
+
+        // Calculate new min distance from source node
+        double minDistance = minDistance(messageIterator);
+
+        // Send new min distance to neighbour vertices if new min distance is less
+        if (minDistance < vertex.getValue()) {
+            setNewVertexValue(minDistance);
+            sendNewDistanceToAll(minDistance);
+        }
+    }
+
+    private double minDistance(MessageIterator<NewMinDistance> messageIterator) {
+        double minDistance = Double.MAX_VALUE;
+        for (NewMinDistance message : messageIterator) {
+            minDistance = Math.min(message.getDistance(), minDistance);
+        }
+        return minDistance;
+    }
+
+    private void sendNewDistanceToAll(double newDistance) {
+        for (Edge<K, Double> edge : getEdges()) {
+            sendMessageTo(edge.getTarget(), new NewMinDistance(edge.getValue() + newDistance));
+        }
+    }
+}
+
+class NewMinDistance {
+    private final double distance;
+
+    public NewMinDistance(double distance) {
+        this.distance = distance;
+    }
+
+    public double getDistance() {
+        return distance;
+    }
+}
+
+class ShortestPathCombiner<K> extends MessageCombiner<K, NewMinDistance> {
+    @Override
+    public void combineMessages(MessageIterator<NewMinDistance> messageIterator) throws Exception {
+        double minDistance = Double.MAX_VALUE;
+        for (NewMinDistance message : messageIterator) {
+            minDistance = Math.min(message.getDistance(), minDistance);
+        }
+
+        sendCombinedMessage(new NewMinDistance(minDistance));
+    }
+}
