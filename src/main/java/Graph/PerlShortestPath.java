@@ -1,4 +1,4 @@
-package 图计算;
+package Graph;
 
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.java.DataSet;
