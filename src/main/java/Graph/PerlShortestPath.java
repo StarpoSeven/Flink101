@@ -42,6 +42,7 @@ public class PerlShortestPath {
 
         Graph<Integer, String, Double> graph = Graph.fromCollection(vertices, edges, env);
 
+        env.addsource()// 缺少kafka
         graph.run(new ShortestPath<>(1, 10)).print();
 
     }
