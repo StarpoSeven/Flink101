@@ -40,14 +40,10 @@ public class SingleSourceShortestPaths {
                 .join(iteration.getSolutionSet()).where(0).equalTo(0)
                 .with(new DistanceFilter());
 
-        // close the delta iteration (changes are empty)
         DataSet<Tuple2<Integer, Double>> result = iteration.closeWith(NewSolutionSet, NewSolutionSet);
 
-
-        // emit result
         if (params.has("output")) {
             result.writeAsCsv(params.get("output"), "\n", " ");
-            // execute program
             env.execute("Connected Components Example");
         } else {
             System.out.println("Printing result to stdout. Use --output to specify output path.");
